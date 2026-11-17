@@ -1,15 +1,16 @@
-# Squad value ranking of the 2026 Série A clubs, January 2020 vs 2026
+# The scarves changed places
 #
-# Reads `data/processed/brazilian_clubs_squad_values.csv` (Transfermarkt
-# squad market values, € millions) and draws one landscape chart (16:10,
-# 32 × 20 cm at 300 dpi) in `viz/`. Run from the project root:
+# Squad market value of the 20 clubs of the 2026 Série A on 1 January 2020
+# and in 2026 (Transfermarkt, € millions), drawn as supporters' scarves.
+# Each scarf runs from the club's rank in 2020 to its rank in 2026, is
+# knitted in the club's colours and is as wide as the squad is valuable.
+# The three biggest climbers and the three biggest fallers are in full
+# colour; the other scarves are faded.
+#
+# One landscape chart (16:10, 32 × 20 cm at 300 dpi) in `viz/`. Run from
+# the project root:
 #
 #   Rscript R/squad-value-chart.R
-#
-# Every club is a ribbon of the same width linking its rank in 2020 to its
-# rank in 2026, so the chart reads as a race of positions. The three biggest
-# climbers and the three biggest fallers are coloured; the others stay grey
-# as context. The values are printed next to each crest.
 
 suppressPackageStartupMessages({
   library(dplyr)
@@ -18,9 +19,8 @@ suppressPackageStartupMessages({
   library(readr)
   library(stringr)
   library(ggplot2)
-  library(ggtext)
   library(ggimage)
-  library(marquee)
+  library(ggtext)
   library(systemfonts)
   library(scales)
 })
@@ -35,43 +35,78 @@ height_cm <- 20
 dir.create("viz", showWarnings = FALSE)
 
 
-# 1. Fonts, palette and helpers ------------------------------------------------
+# 1. Fonts and palette ---------------------------------------------------------
 
 font_dir <- file.path("assets", "fonts")
-register_font(
-  "Libre Baskerville",
-  plain = file.path(font_dir, "LibreBaskerville-Regular.ttf"),
-  bold = file.path(font_dir, "LibreBaskerville-Bold.ttf"),
-  italic = file.path(font_dir, "LibreBaskerville-Italic.ttf")
-)
-serif <- "Libre Baskerville"
+font_file <- function(name) file.path(font_dir, name)
+register_font("Barlow Condensed Black",
+              plain = font_file("BarlowCondensed-Black.ttf"))
+register_font("Barlow Condensed",
+              plain = font_file("BarlowCondensed-Medium.ttf"),
+              bold = font_file("BarlowCondensed-Bold.ttf"))
+register_font("Barlow",
+              plain = font_file("Barlow-Regular.ttf"),
+              bold = font_file("Barlow-SemiBold.ttf"),
+              italic = font_file("Barlow-Italic.ttf"))
+display <- "Barlow Condensed Black"
+condensed <- "Barlow Condensed"
+body <- "Barlow"
 
-pal <- list(
-  background = "#FFFFFF",
-  ink = "#111111",
-  muted = "#6B6B6B",
-  context = "#E1E1E1",
-  context_text = "#8A8A8A",
-  up = "#0F3A7D",
-  down = "#A33A3F"
+ui <- list(
+  paper = "#F3EEE4",
+  ink = "#1A1A1A",
+  muted = "#7A7268",
+  faint = "#B9B0A3",
+  up = "#1D5FA8",
+  down = "#B3261E"
 )
+
+# Mixes a colour with the paper; `amount` = 1 returns the paper.
+fade <- function(colour, amount) {
+  from <- col2rgb(colour) / 255
+  to <- col2rgb(ui$paper) / 255
+  mixed <- from * (1 - amount) + to * amount
+  rgb(mixed[1, ], mixed[2, ], mixed[3, ])
+}
 
 euro <- function(x) str_glue("€{number(x, accuracy = 0.1, big.mark = ',')}m")
 signed <- function(x) case_when(x > 0 ~ str_glue("+{x}"),
                                 x < 0 ~ str_glue("−{abs(x)}"),
                                 TRUE ~ "=")
 
-# Marquee markup: `{#hex **text**}` colours a span in bold.
-color_text <- function(text, color) str_glue("{{{color} **{text}**}}")
 
-text_style <- function(align = "justified-left", lineheight = 1.35) {
-  classic_style(body_font = serif, lineheight = lineheight) |>
-    modify_style("p", align = align, lineheight = lineheight,
-                 margin = trbl(0))
-}
+# 2. Club scarves --------------------------------------------------------------
+
+# Colours repeat along each scarf in the order given, approximating the
+# stripes of the club's kit.
+white <- "#FBFAF7"
+black <- "#161616"
+scarves <- tribble(
+  ~club,                  ~stripes,
+  "Flamengo",             c("#C8102E", black),
+  "Palmeiras",            c("#006437", "#006437", white),
+  "Cruzeiro",             c("#0B3D91", "#0B3D91", white),
+  "Bahia",                c("#0E3990", white, "#D3122C", white),
+  "Fluminense",           c("#7A1530", white, "#00613C", white),
+  "Corinthians",          c(white, white, black),
+  "Vasco",                c(black, black, white),
+  "Botafogo",             c(black, white),
+  "Atlético Mineiro",     c(white, black, black),
+  "Santos",               c(white, black, white, white),
+  "RB Bragantino",        c(white, "#D7193A"),
+  "Grêmio",               c("#0D80BF", black, "#0D80BF", white),
+  "São Paulo",            c(white, "#E2231A", black, "#E2231A"),
+  "Internacional",        c("#E30613", "#E30613", white),
+  "Athletico Paranaense", c("#C8102E", black, black),
+  "Vitória",              c("#E2001A", black, black),
+  "Mirassol",             c("#F2D40C", "#00703C"),
+  "Coritiba",             c(white, "#006B3F", "#006B3F"),
+  "Remo",                 c("#13265C", "#13265C", white),
+  "Chapecoense",          c("#00843D", white)
+)
 
 
-# 2. Data ----------------------------------------------------------------------
+# 3. Data ----------------------------------------------------------------------
 
 clubs <- read_csv("data/processed/brazilian_clubs_squad_values.csv",
                   show_col_types = FALSE) |>
@@ -80,7 +115,10 @@ clubs <- read_csv("data/processed/brazilian_clubs_squad_values.csv",
     rank_2026 = rank(-value_2026, ties.method = "first"),
     change = rank_2020 - rank_2026,
     logo = file.path("assets", "team-logos", logo_file)
-  )
+  ) |>
+  left_join(scarves, by = "club")
+
+stopifnot(!any(map_lgl(clubs$stripes, is.null)))
 
 n_highlight <- 3
 climbers <- slice_max(clubs, change, n = n_highlight, with_ties = FALSE)
@@ -93,149 +131,239 @@ clubs <- clubs |>
       club %in% fallers$club ~ "down",
       TRUE ~ "context"
     ),
-    fill = c(up = pal$up, down = pal$down, context = pal$context)[group],
-    label_color = c(up = pal$up, down = pal$down,
-                    context = pal$context_text)[group]
+    highlighted = group != "context"
   )
 
 total_2020 <- sum(clubs$value_2020)
 total_2026 <- sum(clubs$value_2026)
-top <- slice_max(clubs, change, n = 1)
-bottom <- slice_min(clubs, change, n = 1)
 
 
-# 3. Ribbons -------------------------------------------------------------------
+# 4. Scarf geometry ------------------------------------------------------------
 
-# Ranks run top to bottom, so y = -rank. Each ribbon is a band of constant
-# height whose centre follows a smoothstep between x = 0 and x = 1.
-band <- 0.74
-ribbon_x <- c(0, 1)
+# Ranks run top to bottom (y = -rank). The scarf's centre follows a
+# smoothstep between x = 0 and x = 1 and its width moves linearly from the
+# 2020 to the 2026 value. A row is one unit tall; the most valuable squad
+# fills `max_width` of it.
+max_width <- 0.86
+width_scale <- max_width / max(c(clubs$value_2020, clubs$value_2026))
+n_blocks <- 22
 smooth <- function(t) t^2 * (3 - 2 * t)
 
-ribbons <- clubs |>
-  select(club, group, fill, rank_2020, rank_2026) |>
-  mutate(path = map2(rank_2020, rank_2026, function(r0, r1) {
-    t <- seq(0, 1, length.out = 120)
-    centre <- -(r0 + (r1 - r0) * smooth(t))
+centre_at <- function(t, r0, r1) -(r0 + (r1 - r0) * smooth(t))
+width_at <- function(t, v0, v1) (v0 + (v1 - v0) * t) * width_scale
+
+scarf_blocks <- function(club, rank_2020, rank_2026, value_2020, value_2026,
+                         stripes, highlighted, ...) {
+  breaks <- seq(0, 1, length.out = n_blocks + 1)
+  map_dfr(seq_len(n_blocks), function(k) {
+    t <- seq(breaks[k], breaks[k + 1], length.out = 8)
+    centre <- centre_at(t, rank_2020, rank_2026)
+    half <- width_at(t, value_2020, value_2026) / 2
+    colour <- stripes[(k - 1) %% length(stripes) + 1]
     tibble(
+      club = club, block = k,
       x = c(t, rev(t)),
-      y = c(centre + band / 2, rev(centre - band / 2))
+      y = c(centre + half, rev(centre - half)),
+      fill = if (highlighted) colour else fade(colour, 0.68)
     )
-  })) |>
-  unnest(path) |>
-  # Grey ribbons first, coloured ribbons on top.
-  mutate(layer = if_else(group == "context", 1, 2)) |>
-  arrange(layer)
-
-
-# 4. Labels at both ends -------------------------------------------------------
-
-logo_gap <- 0.045
-value_gap <- 0.095
-name_gap <- 0.255
-change_gap <- 0.61
-
-left <- clubs |>
-  transmute(club, logo, label_color, group, y = -rank_2020,
-            rank = rank_2020, value = euro(value_2020))
-right <- clubs |>
-  transmute(club, logo, label_color, group, y = -rank_2026,
-            rank = rank_2026, value = euro(value_2026),
-            change = signed(change))
-
-end_text <- function(data, x, label, hjust, bold_groups = TRUE,
-                     size = 3.3) {
-  geom_text(data = data,
-            aes(x = x, y = y, label = {{ label }},
-                color = label_color,
-                fontface = if (bold_groups) {
-                  if_else(group == "context", "plain", "bold")
-                } else "plain"),
-            hjust = hjust, family = serif, size = size)
+  })
 }
 
+scarf_outline <- function(club, rank_2020, rank_2026, value_2020, value_2026,
+                          highlighted, ...) {
+  t <- seq(0, 1, length.out = 200)
+  centre <- centre_at(t, rank_2020, rank_2026)
+  half <- width_at(t, value_2020, value_2026) / 2
+  tibble(club = club, x = c(t, rev(t)),
+         y = c(centre + half, rev(centre - half)),
+         colour = if (highlighted) ui$ink else ui$faint)
+}
 
-# 5. Chart ---------------------------------------------------------------------
+# Fringe: short threads beyond each end, spaced across the scarf's width.
+fringe_length <- 0.028
+fringe <- function(club, rank_2020, rank_2026, value_2020, value_2026,
+                   stripes, highlighted, ...) {
+  ends <- tibble(
+    side = c(-1, 1), x = c(0, 1),
+    y = c(-rank_2020, -rank_2026),
+    w = c(value_2020, value_2026) * width_scale,
+    colour = stripes[c(1, (n_blocks - 1) %% length(stripes) + 1)]
+  )
+  pmap_dfr(ends, function(side, x, y, w, colour) {
+    n <- max(1, round(w / 0.045))
+    offsets <- if (n == 1) 0 else seq(-w / 2, w / 2, length.out = n) * 0.86
+    tibble(club = club, x = x, xend = x + side * fringe_length,
+           y = y + offsets, yend = y + offsets,
+           colour = if (highlighted) colour else fade(colour, 0.68))
+  })
+}
 
-subtitle <- str_glue(
-  "The 20 clubs of the 2026 Série A ranked by the market value of their ",
-  "squads, according to Transfermarkt. Together the squads went from ",
-  "**{euro(total_2020)}** on 1 January 2020 to **{euro(total_2026)}** in 2026, ",
-  "and the order changed with it. ",
-  "{color_text(top$club, pal$up)} climbed {top$change} places, from ",
-  "{ordinal(top$rank_2020)} to {ordinal(top$rank_2026)}, while ",
-  "{color_text(bottom$club, pal$down)} fell {abs(bottom$change)}, from ",
-  "{ordinal(bottom$rank_2020)} to {ordinal(bottom$rank_2026)}. ",
-  "Colours mark the three ",
-  "{color_text('biggest climbers', pal$up)} and the three ",
-  "{color_text('biggest fallers', pal$down)}."
+# Knit ribbing: thin lengthwise lines across the highlighted scarves.
+ribbing <- function(club, rank_2020, rank_2026, value_2020, value_2026,
+                    highlighted, ...) {
+  if (!highlighted) return(NULL)
+  t <- seq(0, 1, length.out = 200)
+  centre <- centre_at(t, rank_2020, rank_2026)
+  half <- width_at(t, value_2020, value_2026) / 2
+  map_dfr(c(-0.55, -0.18, 0.18, 0.55), function(k) {
+    tibble(club = club, line = k, x = t, y = centre + k * half)
+  })
+}
+
+draw_order <- clubs |> arrange(highlighted, desc(group))
+blocks <- pmap_dfr(draw_order, scarf_blocks) |>
+  mutate(id = str_glue("{club}-{block}"),
+         layer = match(club, draw_order$club))
+outlines <- pmap_dfr(draw_order, scarf_outline) |>
+  mutate(layer = match(club, draw_order$club))
+threads <- pmap_dfr(draw_order, fringe)
+ribs <- pmap_dfr(draw_order, ribbing) |>
+  mutate(layer = match(club, draw_order$club))
+
+# Context first, highlighted scarves on top, each with its outline.
+scarf_layers <- map(seq_len(nrow(draw_order)), function(i) {
+  list(
+    geom_polygon(data = filter(blocks, layer == i),
+                 aes(x = x, y = y, group = id, fill = fill),
+                 color = NA),
+    geom_path(data = filter(ribs, layer == i),
+              aes(x = x, y = y, group = interaction(club, line)),
+              color = "#000000", alpha = 0.12, linewidth = 0.12),
+    geom_polygon(data = filter(outlines, layer == i),
+                 aes(x = x, y = y, group = club, color = colour),
+                 fill = NA, linewidth = 0.18)
+  )
+})
+
+
+# 5. Labels --------------------------------------------------------------------
+
+crest_gap <- 0.06
+
+left <- clubs |>
+  transmute(club, logo, highlighted, group, y = -rank_2020,
+            name = str_to_upper(club), value = euro(value_2020))
+right <- clubs |>
+  transmute(club, logo, highlighted, group, y = -rank_2026,
+            name = str_to_upper(club), value = euro(value_2026),
+            change = signed(change))
+
+label_colour <- function(data) {
+  case_when(data$group == "up" ~ ui$up, data$group == "down" ~ ui$down,
+            TRUE ~ ui$muted)
+}
+left$colour <- label_colour(left)
+right$colour <- label_colour(right)
+
+# Fixed columns: value next to the crest, then the name, then (right
+# side only) places gained or lost.
+value_gap <- 0.092
+name_gap <- 0.178
+change_x <- 1.5
+
+label_text <- function(data, column, x, hjust, family, fontface = "plain",
+                       size = 3.1) {
+  geom_text(data = data,
+            aes(x = x, y = y, label = .data[[column]], color = colour),
+            hjust = hjust, family = family, fontface = fontface, size = size)
+}
+
+# 6. Legend: what the width means ----------------------------------------------
+
+legend_values <- c(50, 100, 200)
+legend_x <- 1.12
+legend_y <- 3.0
+legend <- tibble(
+  value = legend_values,
+  x = legend_x + c(0, 0.13, 0.26),
+  half = value * width_scale / 2,
+  label = str_glue("€{value}m")
 )
 
+
+# 7. Text ----------------------------------------------------------------------
+
+title <- "THE SCARVES CHANGED PLACES"
+deck <- str_glue(
+  "The squads of the 20 clubs in the 2026 Série A were worth ",
+  "**{euro(total_2020)}** on 1 January 2020 and **{euro(total_2026)}** in ",
+  "2026, according to Transfermarkt. Each scarf joins a club's rank in the ",
+  "two years and is as wide as its squad is valuable. ",
+  "<span style='color:{ui$up};'>**Cruzeiro, Bahia and Botafogo**</span> ",
+  "climbed the most, ",
+  "<span style='color:{ui$down};'>**São Paulo, Grêmio and Internacional**",
+  "</span> fell the most."
+)
 footnote <- str_glue(
-  "**Data**: Transfermarkt, squad market values in € millions\n\n",
-  "**Note**: every ribbon has the same width and links a club's rank in ",
-  "the two years. The right-hand column shows places gained or lost."
+  "**Data** Transfermarkt squad market values, € millions. ",
+  "Scarf colours follow each club's kit."
 )
-footer_y <- -22.6
 
-header_y <- 0.15
-x_limits <- c(-0.66, 1.66)
+
+# 8. Chart ---------------------------------------------------------------------
+
+x_limits <- c(-0.5, 1.5)
+y_top <- 6.4
+header_y <- 0.2
 
 chart <- ggplot() +
-  geom_polygon(data = ribbons,
-               aes(x = x, y = y, group = club, fill = fill),
-               color = pal$background, linewidth = 0.35) +
-  # Column headers.
-  annotate("text", x = 0, y = header_y, label = "1 January 2020",
-           family = serif, fontface = "bold", size = 4.4, color = pal$ink,
-           hjust = 0.5, vjust = 0) +
-  annotate("text", x = 1, y = header_y, label = "2026",
-           family = serif, fontface = "bold", size = 4.4, color = pal$ink,
-           hjust = 0.5, vjust = 0) +
-  annotate("text", x = 1 + change_gap, y = header_y, label = "places",
-           family = serif, size = 3.1, color = pal$muted,
-           hjust = 1, vjust = 0) +
-  # Left end: name, value, crest.
-  geom_image(data = left, aes(x = -logo_gap, y = y, image = logo),
-             size = 0.022, asp = width_cm / height_cm) +
-  end_text(left, -value_gap, value, hjust = 1, bold_groups = FALSE) +
-  end_text(left, -name_gap, club, hjust = 1) +
-  # Right end: crest, value, name, change.
-  geom_image(data = right, aes(x = 1 + logo_gap, y = y, image = logo),
-             size = 0.022, asp = width_cm / height_cm) +
-  end_text(right, 1 + value_gap, value, hjust = 0, bold_groups = FALSE) +
-  end_text(right, 1 + name_gap, club, hjust = 0) +
-  end_text(right, 1 + change_gap, change, hjust = 1) +
+  # Year headers.
+  annotate("text", x = 0, y = header_y, label = "2020", family = display,
+           size = 9, color = ui$ink, hjust = 0.5, vjust = 0) +
+  annotate("text", x = 1, y = header_y, label = "2026", family = display,
+           size = 9, color = ui$ink, hjust = 0.5, vjust = 0) +
+  scarf_layers +
+  geom_segment(data = threads,
+               aes(x = x, xend = xend, y = y, yend = yend, color = colour),
+               linewidth = 0.32, lineend = "round") +
+  # Crests and labels.
+  geom_image(data = left, aes(x = -crest_gap, y = y, image = logo),
+             size = 0.019, asp = width_cm / height_cm) +
+  geom_image(data = right, aes(x = 1 + crest_gap, y = y, image = logo),
+             size = 0.019, asp = width_cm / height_cm) +
+  label_text(left, "value", -value_gap, 1, body, size = 2.95) +
+  label_text(left, "name", -name_gap, 1, condensed, "bold") +
+  label_text(right, "value", 1 + value_gap, 0, body, size = 2.95) +
+  label_text(right, "name", 1 + name_gap, 0, condensed, "bold") +
+  label_text(right, "change", change_x, 1, body, size = 2.95) +
+  # Title block.
+  annotate("text", x = x_limits[1], y = y_top, label = title,
+           family = display, size = 17, color = ui$ink, hjust = 0,
+           vjust = 1) +
+  annotate("textbox", x = x_limits[1], y = y_top - 2.75, label = deck,
+           family = body, size = 3.7, color = ui$ink, hjust = 0, vjust = 1,
+           width = unit(17.5, "cm"), fill = NA, box.color = NA,
+           box.padding = unit(0, "pt"), lineheight = 1.35) +
+  # Width legend.
+  annotate("text", x = legend_x, y = legend_y + 1.15,
+           label = "SCARF WIDTH = SQUAD VALUE", family = condensed,
+           fontface = "bold", size = 3.1, color = ui$ink, hjust = 0) +
+  geom_rect(data = legend,
+            aes(xmin = x, xmax = x + 0.045, ymin = legend_y - half,
+                ymax = legend_y + half),
+            fill = ui$ink) +
+  geom_text(data = legend,
+            aes(x = x + 0.055, y = legend_y, label = label),
+            family = body, size = 2.9, color = ui$ink, hjust = 0) +
+  # Footer.
+  annotate("richtext", x = x_limits[1], y = -21.15, label = footnote,
+           family = body, size = 2.8, color = ui$muted, hjust = 0,
+           vjust = 1, fill = NA, label.color = NA,
+           label.padding = unit(0, "pt")) +
+  annotate("text", x = x_limits[2], y = -21.15, label = str_to_upper(author),
+           family = condensed, fontface = "bold", size = 3, color = ui$ink,
+           hjust = 1, vjust = 1) +
   scale_fill_identity() +
   scale_color_identity() +
-  scale_x_continuous(limits = x_limits, expand = expansion(0)) +
-  # Footer: source and note at the left, author at the right.
-  annotate("marquee", x = x_limits[1], y = footer_y, label = footnote,
-           hjust = 0, vjust = 0, size = 3, colour = pal$ink, family = serif,
-           lineheight = 1, style = text_style("left", 1.3)) +
-  annotate("text", x = x_limits[2], y = footer_y, label = author,
-           hjust = 1, vjust = 0, family = serif, fontface = "bold",
-           size = 3, color = pal$ink) +
+  scale_x_continuous(expand = expansion(0)) +
   scale_y_continuous(expand = expansion(0)) +
-  coord_cartesian(ylim = c(-20.6, header_y + 0.6), clip = "off") +
-  labs(
-    title = "Who climbed Brazilian football's squad value ranking",
-    subtitle = subtitle
-  ) +
-  theme_void(base_family = serif) +
+  coord_cartesian(xlim = x_limits, ylim = c(-21.7, y_top), clip = "off") +
+  theme_void() +
   theme(
-    plot.background = element_rect(fill = pal$background, color = NA),
-    plot.title = element_text(family = serif, size = 27, color = pal$ink,
-                              margin = margin(b = 12)),
-    plot.subtitle = element_marquee(
-      family = serif, size = 12.5, colour = pal$muted, lineheight = 1,
-      width = unit(1, "npc"), margin = margin(b = 22),
-      style = text_style("justified-left", 1.5)
-    ),
-    plot.title.position = "plot",
-    plot.margin = margin(32, 40, 50, 40)
+    plot.background = element_rect(fill = ui$paper, color = NA),
+    plot.margin = margin(30, 40, 22, 40)
   )
 
 ggsave("viz/brazilian-clubs-squad-value-evolution.png", chart,
        width = width_cm, height = height_cm, units = "cm", dpi = 300,
-       device = ragg::agg_png, bg = pal$background)
+       device = ragg::agg_png, bg = ui$paper)
